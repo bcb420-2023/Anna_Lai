@@ -1,0 +1,93 @@
+---
+title: "Data Selection BCB420"
+output: html_notebook
+---
+
+## Setup
+
+```{r}
+if (!requireNamespace("BiocManager", quietly = TRUE))
+install.packages("BiocManager")
+if (!requireNamespace("GEOmetadb", quietly = TRUE))
+BiocManager::install("GEOmetadb")
+if (!requireNamespace("RSQLite", quietly = TRUE))
+install.packages("RSQLite")
+if (!requireNamespace("readr", quietly = TRUE))
+install.packages("readr")
+
+library(BiocManager)
+library(GEOmetadb)
+library(RSQLite)
+library(readr)
+library(utils)
+library(base)
+```
+
+The url has been changed. Reference to ChengYue Zhang's post on the source code to locate this file.
+
+Source code location: 
+https://github.com/zhujack/GEOmetadb/blob/master/R/getSQLiteFile.R
+```{r}
+
+url <- 'https://gbnci.cancer.gov/geo/GEOmetadb.sqlite.gz'
+filename <- 'GEOmetadb.sqlite.gz'
+
+# download.file(url, filename)
+# unzip <- gunzip(filename)
+
+con <- dbConnect(SQLite(), dbname = "GEOmetadb.sqlite")
+```
+
+Check connection and list the databases
+```{r}
+file.info('GEOmetadb.sqlite')
+geo_tables <- dbListTables(con)
+geo_tables
+```
+
+```{r}
+sql <- paste("SELECT DISTINCT gse.title,gse.gse, gpl.title,",
+             " gse.submission_date, gse.supplementary_file",
+             "FROM",
+             " gse JOIN gse_gpl ON gse_gpl.gse=gse.gse",
+             " JOIN gpl ON gse_gpl.gpl=gpl.gpl",
+             "WHERE",
+             " gse.submission_date > '2020-06-01' AND",
+             " gse.title LIKE '%Alzheimer%' AND ",
+             " gpl.organism = 'Homo sapiens' AND",
+             " gpl.technology LIKE '%high-throughput sequencing%' ",
+             " ORDER BY gse.submission_date DESC",
+             sep=" ")
+```
+
+File names of the selected data
+```{r}
+# rs <- dbGetQuery(con, sql)
+dim(rs)
+rs
+```
+
+
+```{r}
+unlist(lapply(rs$supplementary_file,
+FUN = function(x){x <- unlist(strsplit(x,";")) ;
+x <- x[grep(x,pattern="txt",ignore.case = TRUE)];
+tail(unlist(strsplit(x,"/")),n=1)})) [1:10]
+```
+
+
+See if the samples have count data
+```{r}
+rs <- dbGetQuery(con,sql)
+counts_files <- rs$supplementary_file[grep(rs$supplementary_file,
+pattern = "count",ignore.case = TRUE)]
+```
+
+
+```{r}
+sfiles = getGEOSuppFiles('GSE153873')
+fnames = rownames(sfiles)
+fnames
+b2 = read.delim(fnames[2], header = TRUE)
+head(b2)
+```
