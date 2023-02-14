@@ -1,0 +1,67 @@
+---
+title: "Assignment 1"
+author: "Anna Lai"
+date: "February 14, 2023"
+output: html_document
+---
+
+# Exploration of gene set associated with the Alzheimer’s disease
+
+## Setup
+
+```{r setup, error=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+
+# remove.packages("BiocManager")
+if (!requireNamespace("BiocManager", quietly = TRUE))
+install.packages("BiocManager")
+if (!requireNamespace("GEOmetadb", quietly = TRUE))
+BiocManager::install("GEOmetadb")
+if (!requireNamespace("RSQLite", quietly = TRUE))
+install.packages("RSQLite")
+if (!requireNamespace("readr", quietly = TRUE))
+install.packages("readr")
+
+
+suppressPackageStartupMessages({
+library(BiocManager)
+library(GEOmetadb)
+library(RSQLite)
+library(readr)
+library(utils)
+library(base)
+})
+```
+
+## Data cleaning
+
+### Laod Data and simple statistics
+
+As the data description in GEO, there are 30 samples. 31 columns are observed in each table of the supplementary file, the first column is the Gene identifier. 
+```{r, error=FALSE, message=FALSE, warning=FALSE}
+sfiles = getGEOSuppFiles('GSE153873')
+fnames = rownames(sfiles)
+
+b2 = read.delim(fnames[2], header = TRUE)
+b3 = read.delim(fnames[3], header = TRUE)
+
+dim(b2)
+dim(b3)
+```
+
+### HUGO symbol maping
+```{r}
+
+```
+
+
+### Check and remove outliers
+```{r}
+
+```
+
+
+## Normalization
+```{r}
+
+```
+
