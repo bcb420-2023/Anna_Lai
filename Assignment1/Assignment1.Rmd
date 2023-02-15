@@ -4,6 +4,7 @@ author: "Anna Lai"
 date: "February 14, 2023"
 output:
   html_document:
+    toc: yes
     df_print: paged
 ---
 
@@ -11,19 +12,21 @@ output:
 
 ## Setup
 
+Package installation commands hided. 
 ```{r setup, error=FALSE, message=FALSE, warning=FALSE, include=FALSE}
 
 # remove.packages("BiocManager")
 if (!requireNamespace("BiocManager", quietly = TRUE))
 install.packages("BiocManager")
-if (!requireNamespace("GEOmetadb", quietly = TRUE))
-BiocManager::install("GEOmetadb")
+if (!require("GEOmetadb", quietly = TRUE))
+    install.packages("GEOmetadb")
 if (!requireNamespace("RSQLite", quietly = TRUE))
 install.packages("RSQLite")
 if (!requireNamespace("readr", quietly = TRUE))
 install.packages("readr")
+```
 
-
+```{r library, error=FALSE, message=FALSE, warning=FALSE}
 suppressPackageStartupMessages({
 library(BiocManager)
 library(GEOmetadb)
@@ -31,30 +34,115 @@ library(RSQLite)
 library(readr)
 library(utils)
 library(base)
+library(readxl)
 })
 ```
 
 ## Data cleaning
 
-### Laod Data and simple statistics
 
-As the data description in GEO, there are 30 samples. 31 columns are observed in each table of the supplementary file, the first column is the Gene identifier. 
-```{r, error=FALSE, message=FALSE, warning=FALSE}
+### Information about the dataset
+
+As the data description in GEO, there are 30 samples. Basic information about the dataset is shown below.
+
+```{r data info, error=FALSE, message=FALSE, warning=FALSE}
+metadata <- getGEO("GSE153873")
+
+dim(metadata$GSE153873_series_matrix.txt.gz)
+
+metadata$GSE153873_series_matrix.txt.gz$contact_institute[1]
+metadata$GSE153873_series_matrix.txt.gz$contact_city[1]
+metadata$GSE153873_series_matrix.txt.gz$contact_country[1]
+
+metadata$GSE153873_series_matrix.txt.gz$status[1]
+metadata$GSE153873_series_matrix.txt.gz$submission_date[1]
+metadata$GSE153873_series_matrix.txt.gz$last_update_date[1]
+
+metadata$GSE153873_series_matrix.txt.gz$organism_ch1[1]
+metadata$GSE153873_series_matrix.txt.gz$source_name_ch1[1]
+metadata$GSE153873_series_matrix.txt.gz$`tissue:ch1`[1]
+metadata$GSE153873_series_matrix.txt.gz$extract_protocol_ch1[1]
+```
+
+### Information about the platform
+```{r platform, message=FALSE}
+gse <- getGEO("GSE153873",GSEMatrix=FALSE)
+current_gpl <- names(GPLList(gse))[1]
+current_gpl_info <- Meta(getGEO(current_gpl))
+current_gpl_info$`
+title`
+```
+
+**Q1 What are the controls and the test conditions of the dataset?** There are 12 disease samples, 10 samples from old individuals, and 8 from young individuals. 
+
+```{r sample info, message=FALSE}
+exp_con <- data.frame(title = metadata$GSE153873_series_matrix.txt.gz$title,
+           disease_state = metadata$GSE153873_series_matrix.txt.gz$`disease state:ch1`)
+exp_con
+
+count <- table(exp_con$disease_state)
+count
+```
+
+### Extract data
+
+```{r file names, error=FALSE, message=FALSE, warning=FALSE}
 sfiles = getGEOSuppFiles('GSE153873')
 fnames = rownames(sfiles)
 
+new_fnames <- c()
+
+for (string in fnames) {
+  new_string <- sub(".*/Assignment1", "/Assignment1", string)
+  new_fnames <- c(new_fnames, new_string)
+}
+new_fnames
+```
+
+There are 3 supplementary files from this paper. In file 2 and 2, 31 columns are observed in each table, the first column is the Gene identifier. 
+
+```{r file glimpse, error=FALSE, message=FALSE, warning=FALSE}
+b1 = read_excel(fnames[1])
 b2 = read.delim(fnames[2], header = TRUE)
 b3 = read.delim(fnames[3], header = TRUE)
 
+head(b1)
+head(b2)
+head(b3)
+dim(b1)
 dim(b2)
 dim(b3)
 ```
+### Data and Sample condition
 
-### HUGO symbol maping
-```{r}
+File 3 is the file that contains the expression data of the genes of interest. Proceed with file 3. There are 271135 genes in total in the data set.
 
+```{r map col names, message=FALSE}
+b3_cols<- colnames(b3[2:31])
+b3_cols_format <- c()
+for (string in b3_cols) {
+  new_string <- gsub("X(\\d+).(\\d+)(\\w+).(\\w+)", "\\1-\\2\\3-\\4", string)
+  b3_cols_format <- c(b3_cols_format, new_string)
+}
+exp_con <- merge(exp_con, data.frame(b3_cols = b3_cols, title = b3_cols_format), by = "title")
+exp_con_merged
 ```
 
+### Gene Duplication
+```{r duplication check, message=FALSE}
+length(b3$refGene)-length(unique(b3$refGene)) 
+
+# double checking there are no duplicated genes
+summarized_gene_counts <- sort(table(b3$refGene),
+decreasing = TRUE)
+kable(table(b3$refGene)[1:5], format="html")
+kable(summarized_gene_counts[which(summarized_gene_counts>1)[1:5]],format="html")
+```
+
+### HUGO symbol mapping
+```{r HUGO mapping, message=FALSE}
+
+```
 
 ### Check and remove outliers
 ```{r}
@@ -65,5 +153,16 @@ dim(b3)
 ## Normalization
 ```{r}
 
+```
+
+
+## References
+```{r reference, collapse=TRUE}
+citation("BiocManager")
+citation("GEOmetadb")
+citation("RSQLite")
+citation("readr")
+citation("utils")
+citation("base")
 ```
 

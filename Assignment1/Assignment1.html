@@ -1627,29 +1627,134 @@ display: none;
 
 </div>
 
+<div id="TOC">
+<ul>
+<li><a href="#exploration-of-gene-set-associated-with-the-alzheimers-disease" id="toc-exploration-of-gene-set-associated-with-the-alzheimers-disease">Exploration
+of gene set associated with the Alzheimer’s disease</a>
+<ul>
+<li><a href="#setup" id="toc-setup">Setup</a></li>
+<li><a href="#data-cleaning" id="toc-data-cleaning">Data cleaning</a>
+<ul>
+<li><a href="#laod-data-and-simple-statistics" id="toc-laod-data-and-simple-statistics">Laod data and simple
+statistics</a></li>
+<li><a href="#hugo-symbol-maping" id="toc-hugo-symbol-maping">HUGO
+symbol maping</a></li>
+<li><a href="#check-and-remove-outliers" id="toc-check-and-remove-outliers">Check and remove outliers</a></li>
+</ul></li>
+<li><a href="#normalization" id="toc-normalization">Normalization</a></li>
+<li><a href="#references" id="toc-references">References</a></li>
+</ul></li>
+</ul>
+</div>
 
 <div id="exploration-of-gene-set-associated-with-the-alzheimers-disease" class="section level1">
 <h1>Exploration of gene set associated with the Alzheimer’s disease</h1>
 <div id="setup" class="section level2">
 <h2>Setup</h2>
+<p>Package installation commands hided.</p>
+<pre class="r"><code>suppressPackageStartupMessages({
+library(BiocManager)
+library(GEOmetadb)
+library(RSQLite)
+library(readr)
+library(utils)
+library(base)
+library(readxl)
+})</code></pre>
 </div>
 <div id="data-cleaning" class="section level2">
 <h2>Data cleaning</h2>
 <div id="laod-data-and-simple-statistics" class="section level3">
-<h3>Laod Data and simple statistics</h3>
-<p>As the data description in GEO, there are 30 samples. 31 columns are
-observed in each table of the supplementary file, the first column is
-the Gene identifier.</p>
+<h3>Laod data and simple statistics</h3>
+<p>As the data description in GEO, there are 30 samples. Basic
+information about the dataset is shown below.</p>
+<pre class="r"><code>metadata &lt;- getGEO(&quot;GSE153873&quot;)
+
+dim(metadata$GSE153873_series_matrix.txt.gz)</code></pre>
+<pre><code>## Features  Samples 
+##        0       30</code></pre>
+<pre class="r"><code>metadata$GSE153873_series_matrix.txt.gz$contact_institute[1]</code></pre>
+<pre><code>## [1] &quot;University of Pennsylvania&quot;</code></pre>
+<pre class="r"><code>metadata$GSE153873_series_matrix.txt.gz$contact_city[1]</code></pre>
+<pre><code>## [1] &quot;Philadelphia&quot;</code></pre>
+<pre class="r"><code>metadata$GSE153873_series_matrix.txt.gz$contact_country[1]</code></pre>
+<pre><code>## [1] &quot;USA&quot;</code></pre>
+<pre class="r"><code>metadata$GSE153873_series_matrix.txt.gz$
+
+
+metadata$GSE153873_series_matrix.txt.gz$status[1]</code></pre>
+<pre><code>## NULL</code></pre>
+<pre class="r"><code>metadata$GSE153873_series_matrix.txt.gz$submission_date[1]</code></pre>
+<pre><code>## [1] &quot;Jul 06 2020&quot;</code></pre>
+<pre class="r"><code>metadata$GSE153873_series_matrix.txt.gz$last_update_date[1]</code></pre>
+<pre><code>## [1] &quot;Oct 13 2020&quot;</code></pre>
+<pre class="r"><code>metadata$GSE153873_series_matrix.txt.gz$organism_ch1[1]</code></pre>
+<pre><code>## [1] &quot;Homo sapiens&quot;</code></pre>
+<pre class="r"><code>metadata$GSE153873_series_matrix.txt.gz$source_name_ch1[1]</code></pre>
+<pre><code>## [1] &quot;Frozen postmortem brain tissue&quot;</code></pre>
+<pre class="r"><code>metadata$GSE153873_series_matrix.txt.gz$`tissue:ch1`[1]</code></pre>
+<pre><code>## [1] &quot;Lateral temporal lobe&quot;</code></pre>
+<pre class="r"><code>metadata$GSE153873_series_matrix.txt.gz$extract_protocol_ch1[1]</code></pre>
+<pre><code>## [1] &quot;RNA isolated from tissue was spiked with the ERCC Spike-In Mix (equal quantities) and subject to ribosomal RNA removal and sequencing library preparation.&quot;</code></pre>
+<pre class="r"><code>exp_con &lt;- data.frame(title = metadata$GSE153873_series_matrix.txt.gz$title,
+           disease_state = metadata$GSE153873_series_matrix.txt.gz$`disease state:ch1`)
+exp_con</code></pre>
+<div data-pagedtable="false">
+<script data-pagedtable-source type="application/json">
+{"columns":[{"label":["title"],"name":[1],"type":["chr"],"align":["left"]},{"label":["disease_state"],"name":[2],"type":["chr"],"align":["left"]}],"data":[{"1":"13-11T-Old","2":"old"},{"1":"15-13T-Old","2":"old"},{"1":"20-1T-AD","2":"Alzheimer's disease"},{"1":"16-14T-Old","2":"old"},{"1":"3-17T-Young","2":"young"},{"1":"5-18T-Young","2":"young"},{"1":"7-19T-Young","2":"young"},{"1":"21-1A-AD","2":"Alzheimer's disease"},{"1":"23-2A-AD","2":"Alzheimer's disease"},{"1":"26-3A-AD","2":"Alzheimer's disease"},{"1":"27-5A-AD","2":"Alzheimer's disease"},{"1":"12-6A-Old","2":"old"},{"1":"14-7A-Old","2":"old"},{"1":"10-8A-Old","2":"old"},{"1":"22-2T-AD","2":"Alzheimer's disease"},{"1":"17-9A-Old","2":"old"},{"1":"18-10A-Old","2":"old"},{"1":"19-11A-Old","2":"old"},{"1":"2-12A-Young","2":"young"},{"1":"4-13A-Young","2":"young"},{"1":"6-14A-Young","2":"young"},{"1":"8-15A-Young","2":"young"},{"1":"9-16A-Young","2":"young"},{"1":"24-3T-AD","2":"Alzheimer's disease"},{"1":"25-5T-AD","2":"Alzheimer's disease"},{"1":"29-6T-AD","2":"Alzheimer's disease"},{"1":"31-7T-AD","2":"Alzheimer's disease"},{"1":"28-8T-AD","2":"Alzheimer's disease"},{"1":"30-9T-AD","2":"Alzheimer's disease"},{"1":"11-10T-Old","2":"old"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+  </script>
+</div>
+<pre class="r"><code>count &lt;- table(exp_con$disease_state)
+count</code></pre>
+<pre><code>## 
+## Alzheimer&#39;s disease                 old               young 
+##                  12                  10                   8</code></pre>
 <pre class="r"><code>sfiles = getGEOSuppFiles(&#39;GSE153873&#39;)
 fnames = rownames(sfiles)
 
+new_fnames &lt;- c()
+
+for (string in fnames) {
+  new_string &lt;- sub(&quot;.*/Assignment1&quot;, &quot;/Assignment1&quot;, string)
+  new_fnames &lt;- c(new_fnames, new_string)
+}
+new_fnames</code></pre>
+<pre><code>## [1] &quot;/Assignment1/GSE153873/GSE153873_AD.vs.Old_diff.genes.xlsx&quot;
+## [2] &quot;/Assignment1/GSE153873/GSE153873_summary_count.ercc.txt.gz&quot;
+## [3] &quot;/Assignment1/GSE153873/GSE153873_summary_count.star.txt.gz&quot;</code></pre>
+<p>There are 3 supplementary files from this paper. In file 2 and 2, 31
+columns are observed in each table, the first column is the Gene
+identifier.</p>
+<pre class="r"><code>b1 = read_excel(fnames[1])
 b2 = read.delim(fnames[2], header = TRUE)
 b3 = read.delim(fnames[3], header = TRUE)
 
-dim(b2)</code></pre>
+head(b1)</code></pre>
+<div data-pagedtable="false">
+<script data-pagedtable-source type="application/json">
+{"columns":[{"label":["...1"],"name":[1],"type":["chr"],"align":["left"]},{"label":["RO"],"name":[2],"type":["dbl"],"align":["right"]},{"label":["RA"],"name":[3],"type":["dbl"],"align":["right"]},{"label":["RA-RO"],"name":[4],"type":["dbl"],"align":["right"]},{"label":["PRA-RO"],"name":[5],"type":["dbl"],"align":["right"]},{"label":["Padj_PRA-RO"],"name":[6],"type":["dbl"],"align":["right"]}],"data":[{"1":"SGO1","2":"0.889451","3":"2.568363","4":"1.6789117","5":"2.233795e-09","6":"2.393287e-05"},{"1":"ANAPC16","2":"6.289391","3":"6.920068","4":"0.6306775","5":"1.183172e-08","6":"4.051556e-05"},{"1":"VTRNA2-1","2":"3.692709","3":"6.637819","4":"2.9451106","5":"1.323544e-08","6":"4.051556e-05"},{"1":"GNRH1","2":"3.291807","3":"4.685386","4":"1.3935787","5":"3.809156e-08","6":"9.069177e-05"},{"1":"RBM48","2":"5.422133","3":"6.162793","4":"0.7406601","5":"7.069546e-08","6":"1.346774e-04"},{"1":"KLF15","2":"7.538113","3":"8.746365","4":"1.2082527","5":"1.149435e-07","6":"1.642007e-04"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+  </script>
+</div>
+<pre class="r"><code>head(b2)</code></pre>
+<div data-pagedtable="false">
+<script data-pagedtable-source type="application/json">
+{"columns":[{"label":[""],"name":["_rn_"],"type":[""],"align":["left"]},{"label":["ERCCGene"],"name":[1],"type":["chr"],"align":["left"]},{"label":["X13.11T.Old"],"name":[2],"type":["int"],"align":["right"]},{"label":["X15.13T.Old"],"name":[3],"type":["int"],"align":["right"]},{"label":["X20.1T.AD"],"name":[4],"type":["int"],"align":["right"]},{"label":["X16.14T.Old"],"name":[5],"type":["int"],"align":["right"]},{"label":["X3.17T.Young"],"name":[6],"type":["int"],"align":["right"]},{"label":["X5.18T.Young"],"name":[7],"type":["int"],"align":["right"]},{"label":["X7.19T.Young"],"name":[8],"type":["int"],"align":["right"]},{"label":["X21.1A.AD"],"name":[9],"type":["int"],"align":["right"]},{"label":["X23.2A.AD"],"name":[10],"type":["int"],"align":["right"]},{"label":["X26.3A.AD"],"name":[11],"type":["int"],"align":["right"]},{"label":["X27.5A.AD"],"name":[12],"type":["int"],"align":["right"]},{"label":["X12.6A.Old"],"name":[13],"type":["int"],"align":["right"]},{"label":["X14.7A.Old"],"name":[14],"type":["int"],"align":["right"]},{"label":["X10.8A.Old"],"name":[15],"type":["int"],"align":["right"]},{"label":["X22.2T.AD"],"name":[16],"type":["int"],"align":["right"]},{"label":["X17.9A.Old"],"name":[17],"type":["int"],"align":["right"]},{"label":["X18.10A.Old"],"name":[18],"type":["int"],"align":["right"]},{"label":["X19.11A.Old"],"name":[19],"type":["int"],"align":["right"]},{"label":["X2.12A.Young"],"name":[20],"type":["int"],"align":["right"]},{"label":["X4.13A.Young"],"name":[21],"type":["int"],"align":["right"]},{"label":["X6.14A.Young"],"name":[22],"type":["int"],"align":["right"]},{"label":["X8.15A.Young"],"name":[23],"type":["int"],"align":["right"]},{"label":["X9.16A.Young"],"name":[24],"type":["int"],"align":["right"]},{"label":["X24.3T.AD"],"name":[25],"type":["int"],"align":["right"]},{"label":["X25.5T.AD"],"name":[26],"type":["int"],"align":["right"]},{"label":["X29.6T.AD"],"name":[27],"type":["int"],"align":["right"]},{"label":["X31.7T.AD"],"name":[28],"type":["int"],"align":["right"]},{"label":["X28.8T.AD"],"name":[29],"type":["int"],"align":["right"]},{"label":["X30.9T.AD"],"name":[30],"type":["int"],"align":["right"]},{"label":["X11.10T.Old"],"name":[31],"type":["int"],"align":["right"]}],"data":[{"1":"ERCC-00002","2":"44892","3":"36445","4":"24990","5":"22536","6":"116124","7":"103950","8":"47969","9":"32254","10":"74487","11":"68370","12":"63052","13":"67826","14":"39215","15":"41936","16":"34467","17":"27908","18":"64427","19":"51416","20":"30878","21":"29900","22":"18625","23":"141080","24":"30069","25":"58622","26":"120249","27":"74196","28":"25732","29":"116774","30":"28349","31":"22682","_rn_":"1"},{"1":"ERCC-00003","2":"1639","3":"1009","4":"530","5":"478","6":"1732","7":"2673","8":"1034","9":"1379","10":"3343","11":"2166","12":"2558","13":"2397","14":"1506","15":"1742","16":"1094","17":"1137","18":"2188","19":"2205","20":"1031","21":"1232","22":"873","23":"4723","24":"580","25":"2269","26":"2908","27":"1968","28":"654","29":"2857","30":"967","31":"316","_rn_":"2"},{"1":"ERCC-00004","2":"2807","3":"1350","4":"547","5":"590","6":"2497","7":"4453","8":"1251","9":"2593","10":"6303","11":"3383","12":"4019","13":"4136","14":"2326","15":"3176","16":"1794","17":"1620","18":"3590","19":"3938","20":"1516","21":"1938","22":"1482","23":"8885","24":"661","25":"3854","26":"3938","27":"2760","28":"801","29":"4683","30":"1496","31":"340","_rn_":"3"},{"1":"ERCC-00009","2":"1658","3":"1193","4":"887","5":"744","6":"3335","7":"3515","8":"1650","9":"1142","10":"2511","11":"2300","12":"2352","13":"2472","14":"1551","15":"1590","16":"1235","17":"957","18":"2254","19":"2015","20":"1218","21":"1172","22":"744","23":"4842","24":"923","25":"2090","26":"3569","27":"2410","28":"1033","29":"4062","30":"1026","31":"707","_rn_":"4"},{"1":"ERCC-00012","2":"1","3":"1","4":"0","5":"0","6":"2","7":"0","8":"1","9":"0","10":"0","11":"0","12":"0","13":"0","14":"0","15":"0","16":"0","17":"0","18":"0","19":"0","20":"0","21":"0","22":"0","23":"1","24":"0","25":"0","26":"0","27":"0","28":"0","29":"0","30":"0","31":"0","_rn_":"5"},{"1":"ERCC-00013","2":"1","3":"1","4":"1","5":"1","6":"9","7":"3","8":"5","9":"2","10":"4","11":"5","12":"3","13":"1","14":"1","15":"2","16":"1","17":"0","18":"2","19":"0","20":"2","21":"3","22":"2","23":"6","24":"0","25":"4","26":"2","27":"2","28":"0","29":"8","30":"1","31":"2","_rn_":"6"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+  </script>
+</div>
+<pre class="r"><code>head(b3)</code></pre>
+<div data-pagedtable="false">
+<script data-pagedtable-source type="application/json">
+{"columns":[{"label":[""],"name":["_rn_"],"type":[""],"align":["left"]},{"label":["refGene"],"name":[1],"type":["chr"],"align":["left"]},{"label":["X20.1T.AD"],"name":[2],"type":["int"],"align":["right"]},{"label":["X13.11T.Old"],"name":[3],"type":["int"],"align":["right"]},{"label":["X15.13T.Old"],"name":[4],"type":["int"],"align":["right"]},{"label":["X16.14T.Old"],"name":[5],"type":["int"],"align":["right"]},{"label":["X3.17T.Young"],"name":[6],"type":["int"],"align":["right"]},{"label":["X5.18T.Young"],"name":[7],"type":["int"],"align":["right"]},{"label":["X7.19T.Young"],"name":[8],"type":["int"],"align":["right"]},{"label":["X21.1A.AD"],"name":[9],"type":["int"],"align":["right"]},{"label":["X23.2A.AD"],"name":[10],"type":["int"],"align":["right"]},{"label":["X26.3A.AD"],"name":[11],"type":["int"],"align":["right"]},{"label":["X27.5A.AD"],"name":[12],"type":["int"],"align":["right"]},{"label":["X22.2T.AD"],"name":[13],"type":["int"],"align":["right"]},{"label":["X12.6A.Old"],"name":[14],"type":["int"],"align":["right"]},{"label":["X14.7A.Old"],"name":[15],"type":["int"],"align":["right"]},{"label":["X10.8A.Old"],"name":[16],"type":["int"],"align":["right"]},{"label":["X17.9A.Old"],"name":[17],"type":["int"],"align":["right"]},{"label":["X18.10A.Old"],"name":[18],"type":["int"],"align":["right"]},{"label":["X19.11A.Old"],"name":[19],"type":["int"],"align":["right"]},{"label":["X2.12A.Young"],"name":[20],"type":["int"],"align":["right"]},{"label":["X4.13A.Young"],"name":[21],"type":["int"],"align":["right"]},{"label":["X6.14A.Young"],"name":[22],"type":["int"],"align":["right"]},{"label":["X8.15A.Young"],"name":[23],"type":["int"],"align":["right"]},{"label":["X24.3T.AD"],"name":[24],"type":["int"],"align":["right"]},{"label":["X9.16A.Young"],"name":[25],"type":["int"],"align":["right"]},{"label":["X25.5T.AD"],"name":[26],"type":["int"],"align":["right"]},{"label":["X29.6T.AD"],"name":[27],"type":["int"],"align":["right"]},{"label":["X31.7T.AD"],"name":[28],"type":["int"],"align":["right"]},{"label":["X28.8T.AD"],"name":[29],"type":["int"],"align":["right"]},{"label":["X30.9T.AD"],"name":[30],"type":["int"],"align":["right"]},{"label":["X11.10T.Old"],"name":[31],"type":["int"],"align":["right"]}],"data":[{"1":"SGIP1","2":"1405","3":"1405","4":"1169","5":"2408","6":"859","7":"1164","8":"1402","9":"1441","10":"1003","11":"1265","12":"987","13":"1325","14":"2238","15":"1075","16":"2756","17":"2413","18":"1748","19":"1322","20":"2602","21":"3115","22":"2953","23":"1541","24":"795","25":"1614","26":"833","27":"1284","28":"919","29":"1004","30":"1593","31":"1174","_rn_":"1"},{"1":"NECAP2","2":"295","3":"460","4":"334","5":"347","6":"617","7":"585","8":"372","9":"343","10":"374","11":"315","12":"355","13":"491","14":"356","15":"344","16":"217","17":"470","18":"403","19":"338","20":"409","21":"196","22":"220","23":"424","24":"426","25":"387","26":"552","27":"328","28":"353","29":"474","30":"344","31":"350","_rn_":"2"},{"1":"AZIN2","2":"356","3":"306","4":"385","5":"507","6":"787","7":"751","8":"577","9":"238","10":"209","11":"241","12":"211","13":"440","14":"421","15":"296","16":"427","17":"394","18":"360","19":"264","20":"611","21":"323","22":"396","23":"394","24":"179","25":"424","26":"567","27":"292","28":"301","29":"319","30":"348","31":"575","_rn_":"3"},{"1":"AGBL4","2":"191","3":"200","4":"173","5":"323","6":"36","7":"89","8":"184","9":"229","10":"129","11":"154","12":"102","13":"124","14":"268","15":"200","16":"327","17":"282","18":"202","19":"213","20":"328","21":"335","22":"431","23":"38","24":"46","25":"231","26":"45","27":"123","28":"155","29":"108","30":"247","31":"156","_rn_":"4"},{"1":"CLIC4","2":"876","3":"1443","4":"639","5":"792","6":"4806","7":"5968","8":"1392","9":"1117","10":"1247","11":"929","12":"1151","13":"3674","14":"1526","15":"1269","16":"719","17":"4716","18":"1361","19":"819","20":"2493","21":"1332","22":"729","23":"8812","24":"936","25":"689","26":"2534","27":"856","28":"646","29":"1406","30":"1255","31":"665","_rn_":"5"},{"1":"SLC45A1","2":"291","3":"329","4":"298","5":"636","6":"139","7":"204","8":"278","9":"193","10":"152","11":"178","12":"142","13":"224","14":"253","15":"195","16":"474","17":"349","18":"269","19":"231","20":"551","21":"441","22":"506","23":"221","24":"156","25":"409","26":"138","27":"222","28":"251","29":"178","30":"272","31":"350","_rn_":"6"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+  </script>
+</div>
+<pre class="r"><code>dim(b1)</code></pre>
+<pre><code>## [1] 421   6</code></pre>
+<pre class="r"><code>dim(b2)</code></pre>
 <pre><code>## [1] 92 31</code></pre>
 <pre class="r"><code>dim(b3)</code></pre>
 <pre><code>## [1] 27135    31</code></pre>
+<p>File 3 is the file that contains the expression data of the genes of
+interest. Proceed with file 3.</p>
 </div>
 <div id="hugo-symbol-maping" class="section level3">
 <h3>HUGO symbol maping</h3>
@@ -1660,6 +1765,132 @@ dim(b2)</code></pre>
 </div>
 <div id="normalization" class="section level2">
 <h2>Normalization</h2>
+</div>
+<div id="references" class="section level2">
+<h2>References</h2>
+<pre class="r"><code>citation(&quot;BiocManager&quot;)
+## 
+## To cite package &#39;BiocManager&#39; in publications use:
+## 
+##   Martin Morgan (2022). BiocManager: Access the Bioconductor Project
+##   Package Repository. R package version 1.30.19.
+##   https://CRAN.R-project.org/package=BiocManager
+## 
+## A BibTeX entry for LaTeX users is
+## 
+##   @Manual{,
+##     title = {BiocManager: Access the Bioconductor Project Package Repository},
+##     author = {Martin Morgan},
+##     year = {2022},
+##     note = {R package version 1.30.19},
+##     url = {https://CRAN.R-project.org/package=BiocManager},
+##   }
+citation(&quot;GEOmetadb&quot;)
+## 
+## Please cite the following if utilizing the GEOmetadb software:
+## 
+##   Zhu Y, Davis S, Stephens R, Meltzer PS, Chen Y. GEOmetadb: powerful
+##   alternative search engine for the Gene Expression Omnibus.
+##   Bioinformatics. 2008 Dec 1;24(23):2798-800. doi:
+##   10.1093/bioinformatics/btn520. Epub 2008 Oct 7. PubMed PMID:
+##   18842599; PubMed Central PMCID: PMC2639278.
+## 
+## A BibTeX entry for LaTeX users is
+## 
+##   @Article{,
+##     author = {Yuelin Zhu and Sean Davis and Robert Stephens and Paul S. Meltzer and Yidong Chen},
+##     title = {GEOmetadb: powerful alternative search engine for the Gene Expression Omnibus.},
+##     journal = {Bioinformatics (Oxford, England)},
+##     year = {2008},
+##     month = {Dec},
+##     day = {01},
+##     volume = {24},
+##     number = {23},
+##     pages = {2798--2800},
+##     abstract = {The NCBI Gene Expression Omnibus (GEO) represents the largest public repository of microarray data. However, finding data in GEO can be challenging. We have developed GEOmetadb in an attempt to make querying the GEO metadata both easier and more powerful. All GEO metadata records as well as the relationships between them are parsed and stored in a local MySQL database. A powerful, flexible web search interface with several convenient utilities provides query capabilities not available via NCBI tools. In addition, a Bioconductor package, GEOmetadb that utilizes a SQLite export of the entire GEOmetadb database is also available, rendering the entire GEO database accessible with full power of SQL-based queries from within R.},
+##     issn = {1367-4811},
+##     doi = {10.1093/bioinformatics/btn520},
+##     url = {http://www.ncbi.nlm.nih.gov/pubmed/18842599},
+##     language = {eng},
+##   }
+citation(&quot;RSQLite&quot;)
+## 
+## To cite package &#39;RSQLite&#39; in publications use:
+## 
+##   Kirill Müller, Hadley Wickham, David A. James and Seth Falcon (2022).
+##   RSQLite: SQLite Interface for R. R package version 2.2.20.
+##   https://CRAN.R-project.org/package=RSQLite
+## 
+## A BibTeX entry for LaTeX users is
+## 
+##   @Manual{,
+##     title = {RSQLite: SQLite Interface for R},
+##     author = {Kirill Müller and Hadley Wickham and David A. James and Seth Falcon},
+##     year = {2022},
+##     note = {R package version 2.2.20},
+##     url = {https://CRAN.R-project.org/package=RSQLite},
+##   }
+citation(&quot;readr&quot;)
+## 
+## To cite package &#39;readr&#39; in publications use:
+## 
+##   Hadley Wickham, Jim Hester and Jennifer Bryan (2022). readr: Read
+##   Rectangular Text Data. R package version 2.1.3.
+##   https://CRAN.R-project.org/package=readr
+## 
+## A BibTeX entry for LaTeX users is
+## 
+##   @Manual{,
+##     title = {readr: Read Rectangular Text Data},
+##     author = {Hadley Wickham and Jim Hester and Jennifer Bryan},
+##     year = {2022},
+##     note = {R package version 2.1.3},
+##     url = {https://CRAN.R-project.org/package=readr},
+##   }
+citation(&quot;utils&quot;)
+## 
+## The &#39;utils&#39; package is part of R.  To cite R in publications use:
+## 
+##   R Core Team (2021). R: A language and environment for statistical
+##   computing. R Foundation for Statistical Computing, Vienna, Austria.
+##   URL https://www.R-project.org/.
+## 
+## A BibTeX entry for LaTeX users is
+## 
+##   @Manual{,
+##     title = {R: A Language and Environment for Statistical Computing},
+##     author = {{R Core Team}},
+##     organization = {R Foundation for Statistical Computing},
+##     address = {Vienna, Austria},
+##     year = {2021},
+##     url = {https://www.R-project.org/},
+##   }
+## 
+## We have invested a lot of time and effort in creating R, please cite it
+## when using it for data analysis. See also &#39;citation(&quot;pkgname&quot;)&#39; for
+## citing R packages.
+citation(&quot;base&quot;)
+## 
+## To cite R in publications use:
+## 
+##   R Core Team (2021). R: A language and environment for statistical
+##   computing. R Foundation for Statistical Computing, Vienna, Austria.
+##   URL https://www.R-project.org/.
+## 
+## A BibTeX entry for LaTeX users is
+## 
+##   @Manual{,
+##     title = {R: A Language and Environment for Statistical Computing},
+##     author = {{R Core Team}},
+##     organization = {R Foundation for Statistical Computing},
+##     address = {Vienna, Austria},
+##     year = {2021},
+##     url = {https://www.R-project.org/},
+##   }
+## 
+## We have invested a lot of time and effort in creating R, please cite it
+## when using it for data analysis. See also &#39;citation(&quot;pkgname&quot;)&#39; for
+## citing R packages.</code></pre>
 </div>
 </div>
 
