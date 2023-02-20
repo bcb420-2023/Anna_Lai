@@ -14,16 +14,15 @@ output:
 
 Package installation commands hided. 
 ```{r setup, error=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+if (!requireNamespace("BiocManager", quietly = TRUE)){install.packages("BiocManager")}
+if (!require("GEOmetadb", quietly = TRUE)){install.packages("GEOmetadb")}
+if (!requireNamespace("RSQLite", quietly = TRUE)){install.packages("RSQLite")}
+if (!requireNamespace("readr", quietly = TRUE)){install.packages("readr")}
+if (!requireNamespace("AnnotationDbi", quietly = TRUE)){install.packages("AnnotationDbi")}
+if (!requireNamespace("org.Hs.eg.db", quietly = TRUE)){BiocManager::install("org.Hs.eg.db")}
+if (!requireNamespace("wordcloud", quietly = TRUE)){install.packages("wordcloud")}
+if (!requireNamespace("edgeR", quietly = TRUE)){install.packages("edgeR")}
 
-# remove.packages("BiocManager")
-if (!requireNamespace("BiocManager", quietly = TRUE))
-install.packages("BiocManager")
-if (!require("GEOmetadb", quietly = TRUE))
-    install.packages("GEOmetadb")
-if (!requireNamespace("RSQLite", quietly = TRUE))
-install.packages("RSQLite")
-if (!requireNamespace("readr", quietly = TRUE))
-install.packages("readr")
 ```
 
 ```{r library, error=FALSE, message=FALSE, warning=FALSE}
@@ -35,6 +34,14 @@ library(readr)
 library(utils)
 library(base)
 library(readxl)
+library(biomaRt)
+library(dplyr)
+library(knitr)
+library(AnnotationDbi)
+library(org.Hs.eg.db)
+library(wordcloud)
+library(stringr)
+library(edgeR)
 })
 ```
 
@@ -74,6 +81,8 @@ title`
 ```
 
 **Q1 What are the controls and the test conditions of the dataset?** There are 12 disease samples, 10 samples from old individuals, and 8 from young individuals. 
+
+**Q2 Why is this data set of interest to you?** Alzheimer’s disease (AD) has long thought to be an age related disease with an onset age at around 65 years old. By comparing the brain tissue samples of young, adult, and diseased brain, it can yield convincing results on certain genes that regulates the disease. 
 
 ```{r sample info, message=FALSE}
 exp_con <- data.frame(title = metadata$GSE153873_series_matrix.txt.gz$title,
@@ -124,7 +133,7 @@ for (string in b3_cols) {
   new_string <- gsub("X(\\d+).(\\d+)(\\w+).(\\w+)", "\\1-\\2\\3-\\4", string)
   b3_cols_format <- c(b3_cols_format, new_string)
 }
-exp_con <- merge(exp_con, data.frame(b3_cols = b3_cols, title = b3_cols_format), by = "title")
+exp_con_merged <- merge(exp_con, data.frame(b3_cols = b3_cols, title = b3_cols_format), by = "title")
 exp_con_merged
 ```
 
@@ -140,23 +149,238 @@ kable(summarized_gene_counts[which(summarized_gene_counts>1)[1:5]],format="html"
 ```
 
 ### HUGO symbol mapping
+The data is already using HUGO symbol. Hence for the purpose of the assignment, I mapped them to ensembl_gene_id. From the code snippet below we conclude that there are 3592 genes without ensembl_gene_id, and 1466 genes maps to more than 1 ensembl_gene_id.
+
+**Q3 Were there any expression values that could not be mapped to current HUGO symbols?** NO. The dataset uses HUGO notation. 
+
+**Q6 How did you handle replicates in this data?** There are no replicates in this dataset.  
+
 ```{r HUGO mapping, message=FALSE}
 
+ensembl <- useMart("ensembl", dataset = "hsapiens_gene_ensembl")
+
+genes_to_ensembl <- getBM(attributes = c("hgnc_symbol", "ensembl_gene_id"), 
+                           filters = "hgnc_symbol", 
+                           values = b3$refGene, 
+                           mart = ensembl)
+
+# number of genes that are not mapped to Ensembl ID
+included_in_both <- intersect(b3$refGene, genes_to_ensembl$hgnc_symbol) 
+length(b3$refGene)-length(included_in_both)
+
+# genes that mapped to more than 1 ensembl_gene_id
+dup_rows <- duplicated(genes_to_ensembl$hgnc_symbol) | duplicated(genes_to_ensembl$hgnc_symbol, fromLast = TRUE)
+duplicated_df <- genes_to_ensembl[dup_rows, ]
+length(unique(duplicated_df$hgnc_symbol))
 ```
 
-### Check and remove outliers
-```{r}
+## GO term mapping
+Mapping to the GO terms to observe the overall genes included in the data set.
+```{r GO mapping, message=FALSE, warning=FALSE, error=FALSE}
+mapped_terms <- select(org.Hs.eg.db, keys=b3$refGene, keytype="SYMBOL", columns= c("GENENAME", "ONTOLOGY" ,"PATH"))
 
+freq_df <- data.frame(table(mapped_terms$PATH))
+
+kegg_name <- rep("Not Found in KEGG", length(freq_df$Var1))
+
+for (i in 1:length(freq_df$Var1)) {
+  kegg_pathway <- paste("hsa", freq_df$Var1[i], sep = "")
+  url <- paste("http://rest.kegg.jp/get/", kegg_pathway, sep = "")
+  
+    tryCatch(
+    {
+      lines <- readLines(url, warn = FALSE)
+       match <- str_match(lines[2], "NAME\\s+(.*)\\s+-\\s+(.*)")
+      if (!is.na(match[1,2])) {
+        pathway_name <- match[1,2]
+        organism_name <- match[1,3]
+        kegg_name[i]<- pathway_name
+      }
+    },
+    error = function(e) {
+      message(paste0("ERROR: ", e$message))
+    }
+  )
+  
+}
+# kegg_name
+```
+```{r GO mapping Word Cloud, message=FALSE, fig.height= 8, fig.width=8}
+wordcloud(words = kegg_name, freq = freq_df$Freq, min.freq = 1, max.words = 350, random.order = FALSE, rot.per = 0.35,
+          colors = brewer.pal(28, "Dark2"))
 ```
 
+
+### Check and remove low count genes
+***Question 5, how many outliers are removed?*** From the code below, we removed 9713 low count genes. 
+```{r Remove low count, message=FALSE, warning=FALSE}
+
+cpms = cpm(b3[, 2:dim(b3)[2]])
+keep10 = rowSums(cpms >1) >=10
+b3_filtered10 = b3[keep10,]
+
+keep30 = rowSums(cpms >1) >=30
+b3_filtered30 = b3[keep30,]
+
+dim(b3)[1] - dim(b3_filtered10)[1]
+dim(b3)[1] - dim(b3_filtered30)[1]
+
+dim(b3_filtered10)[1] - dim(b3_filtered30)[1]
+```
+
+## Distribution of Data Before normalization
+
+### Box plot
+At this stage, there is no clear separation between the overall expression data between the three sample groups: young, old, AD diseased. 
+```{r box plot, message=FALSE, error=FALSE, warning=FALSE}
+b3plot <- log2(cpm(b3_filtered30[, 2:dim(b3_filtered30)[2]]))
+boxplot(b3plot, xlab = "Sample", ylab = "log2 CPM",
+las = 2, cex = 0.5, cex.lab = 0.5,
+cex.axis = 0.5, main = "Box plot of RNA expression of 30 samples")
+
+abline(h = median(apply(b3plot, 2, median)),
+col = "blue3", lwd = 2, lty = "dashed")
+
+```
+### Density plot
+```{r Density, message=FALSE, error=FALSE, warning=FALSE, fig.height= 8, fig.width=10}
+plot_Density <- function(b3plot){
+counts_density <- apply(b3plot, 2, density)
+
+#calculate the limits across all the samples
+xlim <- 0; ylim <- 0
+for (i in 1:length(counts_density)) {
+xlim <- range(c(xlim, counts_density[[i]]$x));
+ylim <- range(c(ylim, counts_density[[i]]$y))
+}
+cols <- rainbow(length(counts_density))
+ltys <- rep(1, length(counts_density))
+
+#plot the first density plot to initialize the plot
+plot(counts_density[[1]], xlim=xlim, ylim=ylim, type="n",
+ylab="Smoothing density of log2-CPM", main="Density plot of RNA expression data after low count removal", cex.lab = 0.8)
+
+#plot each line
+for (i in 1:length(counts_density)) lines(counts_density[[i]], col=cols[i], lty=ltys[i])
+
+#create legend
+legend("right", colnames(b3plot),
+col=cols, lty=ltys, cex=0.75,
+border ="blue", text.col = "black",
+merge = TRUE, bg = "gray90")
+}
+
+plot_Density(b3plot)
+```
 
 ## Normalization
-```{r}
+
+### MA Plot before nomrmalization
+As my data set is sampled based, I will normalize the data with Trimmed Mean of M-values (TMM)
+ method. I categorized the data in to three conditions according to the publication and picked number 3 randomly to plot the MA plot. From the graphics, the selected 3 samples show that the log expression of gene differs between the samples with different conditions, especially between young and old brains. 
+ 
+```{r MA Plot, message=FALSE, error=FALSE, warning=FALSE, fig.height= 8, fig.width=10}
+sample_col <- colnames(b3_filtered30)
+young_cols <- sample_col[grep("Young", sample_col)]
+ad_cols <- sample_col[grep("AD", sample_col)]
+old_cols <- sample_col[grep("Old", sample_col)]
+other_cols <- sample_col[!(sample_col %in% c(young_cols, ad_cols, old_cols))]
+
+par(mfrow = c(2, 2))
+plotMA(log2(b3_filtered30[, c(ad_cols[3], old_cols[3])]), ylab="M - ratio log expression", 
+       main="AD Diseased sample 3 vs Old sample 3")
+       abline(h = 0, col = "blue3", lwd = 2, lty = "dashed")
+plotMA(log2(b3_filtered30[, c(ad_cols[3], young_cols[3])]), ylab="M - ratio log expression", 
+       main="AD Diseased sample 3 vs Young sample 3")
+       abline(h = 0, col = "blue3", lwd = 2, lty = "dashed")
+plotMA(log2(b3_filtered30[, c(young_cols[3], old_cols[3])]), ylab="M - ratio log expression", 
+       main="Young sample 2 vs Old sample 2")
+       abline(h = 0, col = "blue3", lwd = 2, lty = "dashed")
+```
+### EdgeR Container module and normalization with DEGList
+```{r EdgeR, message=FALSE, error=FALSE, warning=FALSE}
+filtered_data_matrix <- as.matrix(b3_filtered30[, 2:dim(b3_filtered30)[2]])
+rownames(filtered_data_matrix) <- b3_filtered30$refGene
+
+exp_condition <- c("AD", "Old", "Young")
+exp_condition_vec <- str_extract(colnames(b3_filtered30), str_c(exp_condition , collapse="|"))
+
+d = DGEList(counts=filtered_data_matrix, group = exp_condition_vec[2:length(exp_condition_vec)])
+d = calcNormFactors(d)
+normalized_data <- cpm(d)
 
 ```
+
+### Box plot after normalization
+After normalization, the median of each sample differ less to each other than before, which makes the data more comparable. The number of outlier genes (above the maxium point in the boxplots) in each sample remains unchanged. Note that the box plots seemed to have normal distributions as the medians are located at the center of each box. 
+
+```{r After Box plots, message=FALSE, error=FALSE, warning=FALSE, fig.height= 12, fig.width=8}
+par(mfrow = c(2, 1))
+
+boxplot(b3plot, xlab = "Sample", ylab = "log2 CPM",
+las = 2, cex = 0.5, cex.lab = 0.5,
+cex.axis = 0.5, main = "Box plot of RNA expression of 30 samples before normalization")
+
+abline(h = median(apply(b3plot, 2, median)),
+col = "blue3", lwd = 2, lty = "dashed")
+
+boxplot(log2(normalized_data), xlab = "Sample", ylab = "log2 CPM",
+las = 2, cex = 0.5, cex.lab = 0.5,
+cex.axis = 0.5, main = "Box plot of RNA expression of 30 samples after normalization")
+
+abline(h = median(apply(b3plot, 2, median)),
+col = "cyan", lwd = 3, lty = "dashed")
+```
+
+### Density plots after normalization
+There is not significant change in the density plot after normalization.
+```{r Density, message=FALSE, error=FALSE, warning=FALSE, fig.height= 8, fig.width=10}
+par(mfrow = c(1, 2))
+
+plot_Density(b3plot)
+plot_Density(log2(normalized_data))
+
+```
+
+
+### MDS Plot after normalization
+```{r Group, message=FALSE, error=FALSE, warning=FALSE}
+samples <- data.frame(lapply(colnames(normalized_data)[1:31], 
+        FUN=function(x){unlist(strsplit(x, 
+                        split = "\\."))}))
+colnames(samples) <- colnames(normalized_data)[1:31]
+rownames(samples) <- c("sample_number", "A_T", "disease_type")
+samples <- data.frame(t(samples))
+```
+
+From the MDS Plot, three clusters are observed. The green one representing the AD population clusters in the center, while the old population clusters at the left hand side of the graph. Red, representing young population in the sample, scatter across x a-xis, but does not have a y value high than 0.5. 
+
+```{r MDS plot, message=FALSE, error=FALSE, warning=FALSE}
+plotMDS(d, labels=rownames(samples[1:30,]),
+col = c("darkgreen","blue", "red")[factor(samples[1:30,]$disease_type)])
+```
+### BVC plot # does not work now
+```{r}
+model_design <- model.matrix(~samples$sample_number
++ samples$disease_type +0)
+d <- estimateDisp(d, model_design)
+
+plotBCV(d,col.tagwise = "black",col.common = "red",)
+```
+
+### Mean vairance plot
+```{r}
+plotMeanVar(d, show.raw.vars = TRUE, show.tagwise.vars=TRUE,
+show.ave.raw.vars = TRUE,
+NBline=TRUE,
+show.binned.common.disp.vars = TRUE)
+```
+
 
 
 ## References
+Used code snippets from Lecture 4 and 5 of BCB420, written by Professor Ruth Isserlin.
+RMarkdown Cookbood: https://bookdown.org/yihui/rmarkdown-cookbook/figure-size.html
 ```{r reference, collapse=TRUE}
 citation("BiocManager")
 citation("GEOmetadb")
