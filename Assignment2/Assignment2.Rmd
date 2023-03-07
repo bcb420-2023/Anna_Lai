@@ -1,0 +1,117 @@
+---
+title: "Assignment 2"
+author: "Anna Lai"
+date: "March 07, 2023"
+output:
+  html_document:
+    toc: yes
+    df_print: paged
+---
+
+# Differential Gene Expression and Preliminary ORA
+
+## Setup
+
+Package installation commands hided. 
+```{r setup, error=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+if (!requireNamespace("BiocManager", quietly = TRUE)){install.packages("BiocManager")}
+if (!require("GEOmetadb", quietly = TRUE)){install.packages("GEOmetadb")}
+if (!requireNamespace("RSQLite", quietly = TRUE)){install.packages("RSQLite")}
+if (!requireNamespace("readr", quietly = TRUE)){install.packages("readr")}
+if (!requireNamespace("AnnotationDbi", quietly = TRUE)){install.packages("AnnotationDbi")}
+if (!requireNamespace("org.Hs.eg.db", quietly = TRUE)){BiocManager::install("org.Hs.eg.db")}
+if (!requireNamespace("wordcloud", quietly = TRUE)){install.packages("wordcloud")}
+if (!requireNamespace("edgeR", quietly = TRUE)){install.packages("edgeR")}
+
+```
+
+```{r library, error=FALSE, message=FALSE, warning=FALSE}
+suppressPackageStartupMessages({
+library(BiocManager)
+library(GEOmetadb)
+library(RSQLite)
+library(readr)
+library(utils)
+library(base)
+library(readxl)
+library(biomaRt)
+library(dplyr)
+library(knitr)
+library(AnnotationDbi)
+library(org.Hs.eg.db)
+library(wordcloud)
+library(stringr)
+library(edgeR)
+})
+```
+
+## Results from previous assigment
+
+### Extract data
+
+Download the data.
+```{r file names, error=FALSE, message=FALSE, warning=FALSE}
+sfiles = getGEOSuppFiles('GSE153873')
+fnames = rownames(sfiles)
+
+new_fnames <- c()
+
+for (string in fnames) {
+  new_string <- sub(".*/Assignment2", "/Assignment2", string)
+  new_fnames <- c(new_fnames, new_string)
+}
+```
+
+```{r file glimpse, error=FALSE, message=FALSE, warning=FALSE}
+b3 = read.delim(fnames[3], header = TRUE)
+dim(b3)
+```
+### Gene Duplication Check
+```{r duplication check, message=FALSE}
+length(b3$refGene)-length(unique(b3$refGene)) 
+
+# double checking there are no duplicated genes
+summarized_gene_counts <- sort(table(b3$refGene),
+decreasing = TRUE)
+```
+
+### Check and remove low count genes
+```{r Remove low count, message=FALSE, warning=FALSE}
+
+cpms = cpm(b3[, 2:dim(b3)[2]])
+keep30 = rowSums(cpms >1) >=30
+b3_filtered30 = b3[keep30,]
+```
+
+### Normalization - EdgeR Container module and normalization with DEGList
+```{r EdgeR, message=FALSE, error=FALSE, warning=FALSE}
+filtered_data_matrix <- as.matrix(b3_filtered30[, 2:dim(b3_filtered30)[2]])
+rownames(filtered_data_matrix) <- b3_filtered30$refGene
+
+exp_condition <- c("AD", "Old", "Young")
+exp_condition_vec <- str_extract(colnames(b3_filtered30), str_c(exp_condition , collapse="|"))
+
+d = DGEList(counts=filtered_data_matrix, group = exp_condition_vec[2:length(exp_condition_vec)])
+d = calcNormFactors(d)
+normalized_data <- cpm(d)
+
+dim(d)
+```
+## Differential Gene Expression
+
+## Thresholded Over Representation Analysis
+
+## Citation
+
+- Used code snippets from Lecture 4 and 5 of BCB420, written by Professor Ruth Isserlin.
+- RMarkdown Cookbook: https://bookdown.org/yihui/rmarkdown-cookbook/figure-size.html
+
+```{r reference, collapse=TRUE}
+citation("BiocManager")
+citation("GEOmetadb")
+citation("RSQLite")
+citation("readr")
+citation("utils")
+citation("base")
+```
+
