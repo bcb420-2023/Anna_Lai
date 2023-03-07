@@ -138,6 +138,10 @@ exp_con_merged
 ```
 
 ### Gene Duplication
+
+**Q Were there expression values that were not unique for specific genes?** It is likely that the expression values and the symbols have been cleaned before being deposited into the GEO. Hence, from tables before, there doesn't seem to have expression values that were not unique.
+
+**Q How did you handle replicates in this data?** There are no replicates in this data set.
 ```{r duplication check, message=FALSE}
 length(b3$refGene)-length(unique(b3$refGene)) 
 
@@ -151,9 +155,7 @@ kable(summarized_gene_counts[which(summarized_gene_counts>1)[1:5]],format="html"
 ### HUGO symbol mapping
 The data is already using HUGO symbol. Hence for the purpose of the assignment, I mapped them to ensembl_gene_id. From the code snippet below we conclude that there are 3592 genes without ensembl_gene_id, and 1466 genes maps to more than 1 ensembl_gene_id.
 
-**Q3 Were there any expression values that could not be mapped to current HUGO symbols?** NO. The dataset uses HUGO notation. 
-
-**Q6 How did you handle replicates in this data?** There are no replicates in this dataset.  
+**Q Were there any expression values that could not be mapped to current HUGO symbols?** NO. The dataset uses HUGO notation. 
 
 ```{r HUGO mapping, message=FALSE}
 
@@ -174,10 +176,29 @@ duplicated_df <- genes_to_ensembl[dup_rows, ]
 length(unique(duplicated_df$hgnc_symbol))
 ```
 
+### Check and remove low count genes
+***Question 5, how many outliers are removed?*** From the code below, we removed 9713 low count genes. 
+```{r Remove low count, message=FALSE, warning=FALSE}
+
+cpms = cpm(b3[, 2:dim(b3)[2]])
+keep10 = rowSums(cpms >1) >=10
+b3_filtered10 = b3[keep10,]
+
+keep30 = rowSums(cpms >1) >=30
+b3_filtered30 = b3[keep30,]
+
+dim(b3)[1] - dim(b3_filtered10)[1]
+dim(b3)[1] - dim(b3_filtered30)[1]
+
+dim(b3_filtered10)[1] - dim(b3_filtered30)[1]
+```
+
+## Distribution of Data Before normalization
+
 ## GO term mapping
-Mapping to the GO terms to observe the overall genes included in the data set.
+Mapping to the GO terms to observe the overall genes included in the data set after filtering out the low count genes.
 ```{r GO mapping, message=FALSE, warning=FALSE, error=FALSE}
-mapped_terms <- select(org.Hs.eg.db, keys=b3$refGene, keytype="SYMBOL", columns= c("GENENAME", "ONTOLOGY" ,"PATH"))
+mapped_terms <- select(org.Hs.eg.db, keys=b3_filtered30$refGene, keytype="SYMBOL", columns= c("GENENAME", "ONTOLOGY" ,"PATH"))
 
 freq_df <- data.frame(table(mapped_terms$PATH))
 
@@ -205,33 +226,14 @@ for (i in 1:length(freq_df$Var1)) {
 }
 # kegg_name
 ```
+
 ```{r GO mapping Word Cloud, message=FALSE, fig.height= 8, fig.width=8}
 wordcloud(words = kegg_name, freq = freq_df$Freq, min.freq = 1, max.words = 350, random.order = FALSE, rot.per = 0.35,
           colors = brewer.pal(28, "Dark2"))
 ```
 
-
-### Check and remove low count genes
-***Question 5, how many outliers are removed?*** From the code below, we removed 9713 low count genes. 
-```{r Remove low count, message=FALSE, warning=FALSE}
-
-cpms = cpm(b3[, 2:dim(b3)[2]])
-keep10 = rowSums(cpms >1) >=10
-b3_filtered10 = b3[keep10,]
-
-keep30 = rowSums(cpms >1) >=30
-b3_filtered30 = b3[keep30,]
-
-dim(b3)[1] - dim(b3_filtered10)[1]
-dim(b3)[1] - dim(b3_filtered30)[1]
-
-dim(b3_filtered10)[1] - dim(b3_filtered30)[1]
-```
-
-## Distribution of Data Before normalization
-
 ### Box plot
-At this stage, there is no clear separation between the overall expression data between the three sample groups: young, old, AD diseased. 
+At this stage, there is no clear separation between the overall expression data between the three sample groups: young, old, AD diseased. There are a lot of outliers in the data as shown in the box plot.
 ```{r box plot, message=FALSE, error=FALSE, warning=FALSE}
 b3plot <- log2(cpm(b3_filtered30[, 2:dim(b3_filtered30)[2]]))
 boxplot(b3plot, xlab = "Sample", ylab = "log2 CPM",
@@ -243,7 +245,7 @@ col = "blue3", lwd = 2, lty = "dashed")
 
 ```
 ### Density plot
-```{r Density, message=FALSE, error=FALSE, warning=FALSE, fig.height= 8, fig.width=10}
+```{r density, message=FALSE, error=FALSE, warning=FALSE, fig.height= 8, fig.width=10}
 plot_Density <- function(b3plot){
 counts_density <- apply(b3plot, 2, density)
 
@@ -287,13 +289,13 @@ old_cols <- sample_col[grep("Old", sample_col)]
 other_cols <- sample_col[!(sample_col %in% c(young_cols, ad_cols, old_cols))]
 
 par(mfrow = c(2, 2))
-plotMA(log2(b3_filtered30[, c(ad_cols[3], old_cols[3])]), ylab="M - ratio log expression", 
+limma::plotMA(log2(b3_filtered30[, c(ad_cols[3], old_cols[3])]), ylab="M - ratio log expression", 
        main="AD Diseased sample 3 vs Old sample 3")
        abline(h = 0, col = "blue3", lwd = 2, lty = "dashed")
-plotMA(log2(b3_filtered30[, c(ad_cols[3], young_cols[3])]), ylab="M - ratio log expression", 
+limma::plotMA(log2(b3_filtered30[, c(ad_cols[3], young_cols[3])]), ylab="M - ratio log expression", 
        main="AD Diseased sample 3 vs Young sample 3")
        abline(h = 0, col = "blue3", lwd = 2, lty = "dashed")
-plotMA(log2(b3_filtered30[, c(young_cols[3], old_cols[3])]), ylab="M - ratio log expression", 
+limma::plotMA(log2(b3_filtered30[, c(young_cols[3], old_cols[3])]), ylab="M - ratio log expression", 
        main="Young sample 2 vs Old sample 2")
        abline(h = 0, col = "blue3", lwd = 2, lty = "dashed")
 ```
@@ -309,7 +311,9 @@ d = DGEList(counts=filtered_data_matrix, group = exp_condition_vec[2:length(exp_
 d = calcNormFactors(d)
 normalized_data <- cpm(d)
 
+dim(d)
 ```
+**Q What's the final coverage of your data?** The final coverage is 13986 genes. 
 
 ### Box plot after normalization
 After normalization, the median of each sample differ less to each other than before, which makes the data more comparable. The number of outlier genes (above the maxium point in the boxplots) in each sample remains unchanged. Note that the box plots seemed to have normal distributions as the medians are located at the center of each box. 
@@ -333,15 +337,14 @@ col = "cyan", lwd = 3, lty = "dashed")
 ```
 
 ### Density plots after normalization
-There is not significant change in the density plot after normalization.
-```{r Density, message=FALSE, error=FALSE, warning=FALSE, fig.height= 8, fig.width=10}
+There is no significant change in the density plot after normalization.
+```{r n density plots, message=FALSE, error=FALSE, warning=FALSE, fig.height= 8, fig.width=10}
 par(mfrow = c(1, 2))
 
 plot_Density(b3plot)
 plot_Density(log2(normalized_data))
 
 ```
-
 
 ### MDS Plot after normalization
 ```{r Group, message=FALSE, error=FALSE, warning=FALSE}
@@ -351,36 +354,44 @@ samples <- data.frame(lapply(colnames(normalized_data)[1:31],
 colnames(samples) <- colnames(normalized_data)[1:31]
 rownames(samples) <- c("sample_number", "A_T", "disease_type")
 samples <- data.frame(t(samples))
+samples <- samples[1:30, ]
 ```
 
-From the MDS Plot, three clusters are observed. The green one representing the AD population clusters in the center, while the old population clusters at the left hand side of the graph. Red, representing young population in the sample, scatter across x a-xis, but does not have a y value high than 0.5. 
+From the MDS Plot, three clusters are observed. The green one representing the AD population clusters in the center, while the old population clusters at the left hand side of the graph. Red, representing young population in the sample, scatter across x a-xis, but does not have a y value higher than 0.5.
 
 ```{r MDS plot, message=FALSE, error=FALSE, warning=FALSE}
-plotMDS(d, labels=rownames(samples[1:30,]),
-col = c("darkgreen","blue", "red")[factor(samples[1:30,]$disease_type)])
+plotMDS(d, labels=rownames(samples),
+col = c("darkgreen","blue", "red")[factor(samples$disease_type)],
+main="MDS plot of Young, Old, AD samples")
 ```
-### BVC plot # does not work now
+### BCV plot
+Biological coefficient of variation(BCV) plot. Genes with more counts should have less variance than the high counts as discussed in class. However, it is not the case in this data set from the BCV generated below. A high number of outliers with high count might explain the behavior of this resulting plot. 
 ```{r}
-model_design <- model.matrix(~samples$sample_number
-+ samples$disease_type +0)
-d <- estimateDisp(d, model_design)
+# warning shown when model design is included in the calculation of dispersion. Omitted for now. 
+model_design <- model.matrix(~samples$disease_type +   0)
+bcv_d <- estimateDisp(d, model_design)
 
-plotBCV(d,col.tagwise = "black",col.common = "red",)
+plotBCV(bcv_d, col.tagwise = "black",col.common = "red",
+        main= "BCV plot for Old, Young, AD type cells")
 ```
 
 ### Mean vairance plot
+Each dot on the graph represents one gene. 
 ```{r}
-plotMeanVar(d, show.raw.vars = TRUE, show.tagwise.vars=TRUE,
+plotMeanVar(bcv_d, show.raw.vars = TRUE, show.tagwise.vars=TRUE,
 show.ave.raw.vars = TRUE,
 NBline=TRUE,
-show.binned.common.disp.vars = TRUE)
+show.binned.common.disp.vars = TRUE,
+main="Mean Variance plot of expression level of genes")
 ```
 
-
-
 ## References
-Used code snippets from Lecture 4 and 5 of BCB420, written by Professor Ruth Isserlin.
-RMarkdown Cookbood: https://bookdown.org/yihui/rmarkdown-cookbook/figure-size.html
+
+### Ciatations
+
+- Used code snippets from Lecture 4 and 5 of BCB420, written by Professor Ruth Isserlin.
+- RMarkdown Cookbook: https://bookdown.org/yihui/rmarkdown-cookbook/figure-size.html
+
 ```{r reference, collapse=TRUE}
 citation("BiocManager")
 citation("GEOmetadb")
